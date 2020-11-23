@@ -3,7 +3,7 @@
 Plugin Name: Movies Plugin
 Description: This is a our Movie plugin,which is used by the students. 
 Author: Adarsh Kumar Shah
-Text Domain:movie-plugin
+Text Domain:nm-plugin
 Version: 1.0
 */
 /*
@@ -89,6 +89,22 @@ function create_taxonomies() {
 
 function custum_movie_plugin(){
 	// css and js file
+    $slug='';
+    $page_include=array('frontendpage','movie-list','movie-add','movie-edit');
+
+    if(empty($currentPage)){
+            $actual_link="http://$_SERVER[HTTP_HOST]$_SERVER[REQUEST_URI]";
+            if(preg_match("/my_movie/",$actual_link)){
+              $currentPage="frontendpage";   
+            }
+            
+        }
+
+    $currentPage=$GET['page'];
+    if(in_array($currentPage,$page_include)){
+
+       
+    }
 
     wp_enqueue_style("bootstrap", // unique name
         PLUGIN_URL."/movies_plugin/assest/CSS/bootstrap.min.css", // css file path
@@ -105,9 +121,9 @@ function custum_movie_plugin(){
     '', // dependency on other file
     PLUGIN_VERSION);
 
-	wp_enqueue_style("style", // unique name
-		PLUGIN_URL."/movies_plugin/assest/CSS/style.css", // css file path
-	'', // dependency on other file
+    wp_enqueue_style("style", // unique name
+        PLUGIN_URL."/movies_plugin/assest/CSS/style.css", // css file path
+    '', // dependency on other file
     PLUGIN_VERSION);
     
 //script
@@ -140,6 +156,7 @@ function custum_movie_plugin(){
     PLUGIN_VERSION,
     true);
     wp_localize_script("script.js","mymovieajaxurl",admin_url("admin-ajax.php"));
+
 }
 add_action("init","custum_movie_plugin");
 
@@ -196,8 +213,9 @@ function my_movie_list_drop_table(){
     //step-1: we get the id of the post page
     //delete the page from table
 
-    $the_post_id=get_option("plugin_page"); // getting the id of the post name (plugin_page)
+    $the_post_id=get_option("movie_page"); // getting the id of the post name (movie_page)
     if(!empty($the_post_id)){
+        delete_option($the_post_id,true);
     	wp_delete_post($the_post_id, true);
     }
 }
@@ -209,19 +227,43 @@ register_uninstall_hook(__FILE__,"my_movie_list_drop_table");
 function create_page(){
 	// creating page
 	$page=array();
-	$page['post_title']="Online Movie Management";
-	$page['post_content']="Entertainment Platform for the All";
+	$page['post_title']="movie page";
+	$page['post_content']="[movie_page]";
 	$page['post_status']="publish";
-	$page['page_slug']="Online Movie Management";
-	$page['post_title']=" Online Movie Management";
-	$page['post_type']="page";
-    
-	//$post_id=wp_insert_post($page); // post_id as return value
+    $page['post_type']="page";
+    $page['post_name']="my_movie";
 
-	//add_option("plugin_page",$post_id); // with the help of this post_id we can delete the plugin page on deactivation of plugin.
-	wp_insert_post($page);
+
+	$post_id=wp_insert_post($page); // post_id as return value
+
+	add_option("movie_page",$post_id); // with the help of this post_id we can delete the plugin page on deactivation of plugin.
 }
 register_activation_hook(__FILE__,"create_page");
+
+
+function page(){
+   include_once PLUGIN_DIR_PATH."/view/movie-add.php";
+   include_once PLUGIN_DIR_PATH."/view/movie-list.php";
+}
+add_shortcode("movie_page","page");
+
+
+// front End of page listioning of book
+
+function page_layout($page_template){
+    global $post;
+    $page_slug=$post->post_name;
+
+    if($page_slug=="my_movie"){
+        $page_template=PLUGIN_DIR_PATH."/view/frontend-movie-template.php";
+    }
+    return $page_template;
+}
+add_filter("page_template","page_layout");
+
+
+
+
 
 function my_movie_table(){
     global $wpdb;
@@ -287,10 +329,7 @@ function my_movie_ajax_handler(){
  }
     wp_die();
 }
-
-
 // implementing isotope
-
 function shortcode_movies_post_type(){
  
     $args = array(
@@ -327,211 +366,3 @@ function shortcode_movies_post_type(){
 add_shortcode( 'movie-list', 'shortcode_movies_post_type');
 
 
-// implementing isotope on movie list
-
-add_shortcode('isotope',function($atts,$content=null){
-    
-    wp_enqueue_script('isotope-js','https://unpkg.com/isotope-layout@3/dist/isotope.pkgd.min.js',array(),true);
-    
-    $query = new WP_Query(array(
-        'post_type'=>'movies',
-        'posts_per_page'=>9
-    ));
-    if($query->have_posts()){
-        $posts = [];
-        $all_categories=[];
-        $all_tags = [];
-        while($query->have_posts()){
-            $query->the_post();
-            global $post;
-            $category = wp_get_object_terms($post->ID,'category');
-            $tag = wp_get_object_terms($post->ID,'post_tag');
-            if(!empty($category)){
-                $post->cats=[];
-                foreach($category as $cat){
-                     $post->cats[]=$cat->slug;
-                    if(!in_array($cat->term_id,array_keys($all_categories))){
-                        $all_categories[$cat->term_id]=$cat;
-                    }
-                }
-            }
-            if(!empty($tag)){
-                $post->tags=[];
-                foreach($tag as $t){
-                    $post->tags[] = $t->slug;
-                    if(!in_array($t->term_id,array_keys($all_tags))){
-                        $all_tags[$t->term_id]=$t;
-                    }
-                }
-            }
-            $posts[] = $post;
-        }
-        wp_reset_postdata();
-
-        echo '<div class="isotope_wrapper"><div>';
-        if(!empty($all_categories)){
-            ?>
-            <ul class="post_categories">
-            <?php
-                foreach($all_categories as $category){
-                    ?>
-                <li class="grid-selector" data-filter="<?php echo $category->slug; ?>"><?php echo $category->name; ?></li>
-                     <?php
-                }
-            ?>
-            </ul>
-            <?php
-        }
-        if(!empty($all_tags)){
-            ?>
-            <ul class="post_tags">
-            <?php
-                foreach($all_tags as $category){
-                    ?>
-                <li class="grid-subselector" data-filter="<?php echo $category->slug; ?>"><?php echo $category->name; ?></li>
-                     <?php
-                }
-            ?>
-            </ul>
-            <?php
-        }
-        ?>
-        </div>
-        <div class="grid">
-        <?php
-        foreach($posts as $post){
-            ?>
-            <div class="grid-item <?php echo empty($post->cats)?'':implode(',',$post->cats); ?> <?php echo empty($post->tags)?'':implode(',',$post->tags); ?>">
-                
-                <h2>
-                    <a href="<?php echo get_permalink($post->ID); ?>"><?php echo $post->post_title; ?></a>
-                </h2>
-            </div>
-            <?php
-        }
-        ?>
-        </div></div>
-        <script>
-            window.addEventListener('load',function(){
-                var iso = new Isotope( document.querySelector('.grid'), {
-                  itemSelector: '.grid-item',
-                  layoutMode: 'fitRows'
-                });
-                document.querySelectorAll('.grid-selector').forEach(function(el){
-
-                    el.addEventListener('click',function(){
-                        
-                        let sfilter = el.getAttribute('data-filter');
-
-                        iso.arrange({
-                          filter: function( gridIndex, itemElem ) {
-                            return itemElem.classList.contains(sfilter);
-                          }
-                        });
-                        
-                    });
-                });
-
-
-                document.querySelectorAll('.grid-subselector').forEach(function(el){
-
-                    el.addEventListener('click',function(){
-                        
-                        let sfilter = el.getAttribute('data-filter');
-
-                        iso.arrange({
-                          filter: function( gridIndex, itemElem ) {
-                            return itemElem.classList.contains(sfilter);
-                          }
-                        });
-                        
-                    });
-                });
-                
-            });
-        </script>
-        <style>
-            .isotope_wrapper {
-                display: flex;
-                flex-direction: column;
-            }
-
-            .isotope_wrapper > div {
-                display: flex;
-                flex-direction: row;
-                flex-wrap: wrap;
-                margin: 0 -1rem;
-                justify-content: space-between;
-            }
-
-            .isotope_wrapper > div > ul {
-                display: flex;
-                flex-wrap: wrap;
-                margin: 1rem;
-            }
-
-            .isotope_wrapper > div>div {
-                padding: 1rem;
-                border: 1px solid #eee;
-                margin: 1rem;
-            }
-
-            .isotope_wrapper > div > ul > li {
-                padding: 0.5rem 1rem;
-                background: #eee;
-                margin: 2px;cursor:pointer;
-                border-radius: 4px;
-            }
-        </style>
-        <?php
-    }
-});
-
-//load more button
-add_action( 'wp_footer', 'my_action_javascript' ); // Write our JS below here
-
-function my_action_javascript() { ?>
-    <script type="text/javascript" >
-    jQuery(document).ready(function($) {
-        var page_count='<?php echo ceil(wp_count_posts('post')->publish/2); ?>';
-        var ajaxurl='<?php echo admin_url('admin-ajax.php');?>';
-        var page=2;
-        jQuery('#load_more').click(function(){
-        var data = {
-            'action': 'my_action',
-            'whatever': page,
-        };
-        jQuery.post(ajaxurl, data, function(response) {
-            jQuery('.book-item').append(response);
-            if(page_count==page){
-                jQuery('#load_more').hide();
-            }
-            page=page + 1;
-        });
-    });
-   });
-    </script> <?php
-}
-add_action( 'wp_ajax_my_action', 'my_action' );
-add_action( 'wp_ajax_nopriv_my_action', 'my_action' );
-function my_action() {
-    global $wpdb; // this is how you get access to the database
-        $args=array(
-   'post_type'=>'movies',
-   'paged'=>$_POST['page'],
-   );
-    $the_query = new WP_Query( $args );
-     
-    // The Loop
-    if ( $the_query->have_posts() ) {
-        while ( $the_query->have_posts() ) {
-            $the_query->the_post();
-            echo '<li>' . get_the_title() . '</li>';
-        }
-    } else {
-        // no posts found
-    }
-    /* Restore original Post Data */
-    wp_reset_postdata();
-    wp_die(); 
-}
